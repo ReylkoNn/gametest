@@ -1,0 +1,13 @@
+{
+  "name": "kings-order-local-rp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local NSFW RP app: chat via API, smart trust, wardrobe, time, locations",
+  "scripts": {
+    "start": "python3 server.py",
+    "test": "node test/engine.test.js && node test/dom.test.js"
+  },
+  "devDependencies": {
+    "jsdom": "^24.0.0"
+  }
+}

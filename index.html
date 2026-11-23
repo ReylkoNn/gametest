@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The King's Order — local RP</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ══════════════ top status bar ══════════════ -->
+<header id="topbar" class="hidden">
+  <span id="topbarText"></span>
+  <button id="topbarClose" class="icon-btn" title="Скрыть">✕</button>
+</header>
+<button id="topbarShow" class="hidden" title="Показать статус">●</button>
+
+<div id="layout">
+
+  <!-- ══════════════ chat pane ══════════════ -->
+  <main id="chatPane">
+    <div id="messages" aria-live="polite"></div>
+
+    <div id="composer">
+      <div id="composerOpts">
+        <label class="chk" title="Не двигать игровые часы при этой отправке">
+          <input type="checkbox" id="skipTime">
+          <span>⏱ без времени</span>
+        </label>
+        <button id="btnSettings" class="ghost-btn" title="Настройки API">⚙ API</button>
+        <button id="btnPanel" class="ghost-btn mob-only" title="Панель состояния">📋</button>
+      </div>
+      <div id="inputRow">
+        <textarea id="input" rows="1" placeholder="Твоё сообщение… (Enter — отправить, Shift+Enter — перенос)"></textarea>
+        <button id="btnSend" title="Отправить">➤</button>
+      </div>
+    </div>
+  </main>
+
+  <!-- ══════════════ right panel ══════════════ -->
+  <aside id="side">
+    <div class="side-head mob-only">
+      <span>Состояние игры</span>
+      <button id="closeSide" class="icon-btn">✕</button>
+    </div>
+    <div id="cards"><!-- cards injected by ui.js --></div>
+  </aside>
+</div>
+
+<div id="scrim" class="hidden"></div>
+<div id="modalRoot" class="hidden"></div>
+
+<script src="js/data.js"></script>
+<script src="js/state.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/api.js"></script>
+<script src="js/chat.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
