@@ -189,6 +189,30 @@ console.log("— old-english save migration —");
   });
   State.init();
   T("edited rulebook kept", State.game.rulebook === "Мой кастомный правилник");
+  // untouched save (greeting only) stuck on the old nude default → nightshirt
+  global.localStorage._s["kings-order-save-v1"] = JSON.stringify({
+    v: 1, game: edited, settings: State.settings,
+    play: { trust: 19, day: 1, minutes: 1415, location: "Viora's Bedroom",
+            npcClothes: "Completely Nude", playerClothes: "Academy Outfit (Fully Clothed)",
+            messages: [{ id: 1, role: "assistant", greeting: true, v: 0, variants: [{ text: "x" }] }],
+            pending: { location: null, npcClothes: null, playerClothes: null, day: null, minutes: null },
+            toggles: { interactive: true, hideStats: false, statusLine: true } }
+  });
+  State.init();
+  T("greeting-only save: nude default → nightshirt", State.play.npcClothes === "Nightshirt (No Underwear)");
+  // played scene: clothes stay whatever the story made them
+  global.localStorage._s["kings-order-save-v1"] = JSON.stringify({
+    v: 1, game: edited, settings: State.settings,
+    play: { trust: 19, day: 1, minutes: 1415, location: "Viora's Bedroom",
+            npcClothes: "Completely Nude", playerClothes: "Academy Outfit (Fully Clothed)",
+            messages: [{ id: 1, role: "assistant", greeting: true, v: 0, variants: [{ text: "x" }] },
+                       { id: 2, role: "user", content: "y" },
+                       { id: 3, role: "assistant", content: "z" }],
+            pending: { location: null, npcClothes: null, playerClothes: null, day: null, minutes: null },
+            toggles: { interactive: true, hideStats: false, statusLine: true } }
+  });
+  State.init();
+  T("played scene keeps story clothes", State.play.npcClothes === "Completely Nude");
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

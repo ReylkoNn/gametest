@@ -87,6 +87,12 @@
         g.trust.increase = window.DEFAULT_GAME.trust.increase.slice();
         g.trust.decrease = window.DEFAULT_GAME.trust.decrease.slice();
       }
+      // untouched scene still on the old "nude" default → nightshirt per the greeting
+      const p = this.play;
+      if (p && p.npcClothes === "Completely Nude" &&
+          Array.isArray(p.messages) && p.messages.length <= 1) {
+        p.npcClothes = "Nightshirt (No Underwear)";
+      }
     },
 
     avatarSrc() {

@@ -172,7 +172,7 @@ window.DEFAULT_PLAY = {
   day: 1,
   minutes: 23 * 60 + 35,
   location: "Viora's Bedroom",
-  npcClothes: "Completely Nude",
+  npcClothes: "Nightshirt (No Underwear)",
   playerClothes: "Academy Outfit (Fully Clothed)",
   pending: { location: null, npcClothes: null, playerClothes: null, day: null, minutes: null },
   toggles: { interactive: true, hideStats: false, statusLine: true },
