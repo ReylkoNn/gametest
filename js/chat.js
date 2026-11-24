@@ -2,6 +2,7 @@
 (function () {
   let uid = 1;
   let busy = false;
+  let fileGreeting = null; // текст из first-message.txt (приоритет над дефолтным)
 
   /* ── tiny safe markdown for bubbles (escape first, then format) ── */
   function mdRender(raw) {
@@ -60,10 +61,37 @@
       this.render();
     },
 
+    /* greeting source: first-message.txt in the repo (user's own neural-net
+       first message). Falls back to DEFAULT_GAME.greeting when absent. */
+    async loadGreetingFile() {
+      try {
+        const r = await fetch("first-message.txt", { cache: "no-store" });
+        if (!r || !r.ok) return false;
+        const text = (await r.text()).replace(/\r\n?/g, "\n").trim();
+        if (!text) return false;
+        fileGreeting = text;
+        const changed = State.game.greeting !== text;
+        State.game.greeting = text;
+        const msgs = State.play.messages;
+        if (msgs.length === 1 && msgs[0].greeting && msgs[0].variants[0].text !== text) {
+          // lone greeting from an earlier boot → refresh it from the file
+          msgs[0].variants[0].text = text;
+          State.scheduleSave();
+          if (this.$list) this.render();
+        } else if (changed) {
+          State.scheduleSave();
+        }
+        return true;
+      } catch (e) {
+        return false; // no file (file://, old checkout) → keep current greeting
+      }
+    },
+
     /* first launch: in-character greeting from the bot */
     ensureGreeting() {
       if (State.play.messages.length) return;
-      const text = (State.game.greeting || "").trim();
+      if (fileGreeting && State.game.greeting !== fileGreeting) State.game.greeting = fileGreeting;
+      const text = (fileGreeting || State.game.greeting || "").trim();
       if (!text) return;
       State.play.messages.push({
         id: uid++, role: "assistant", ts: Date.now(),
@@ -129,7 +157,8 @@
       const v = m.variants[m.v] || m.variants[0];
       const bubble = document.createElement("div");
       bubble.className = "bubble";
-      bubble.innerHTML = mdRender(Api.sanitize(v.text));
+      // the user's own first-message.txt is rendered as-is (no filters)
+      bubble.innerHTML = mdRender(m.greeting ? v.text : Api.sanitize(v.text));
       col.appendChild(bubble);
 
       if (State.play.toggles.statusLine && v.status && v.status.length) {
@@ -181,7 +210,7 @@
       const copy = document.createElement("button");
       copy.textContent = "📋";
       copy.title = "Копировать";
-      copy.onclick = () => navigator.clipboard?.writeText(Api.sanitize(v.text));
+      copy.onclick = () => navigator.clipboard?.writeText(m.greeting ? v.text : Api.sanitize(v.text));
       actions.appendChild(copy);
       col.appendChild(actions);
       return wrap;

@@ -136,6 +136,19 @@ const msgs2 = Api.buildMessages([
 ]);
 T("greeting folded into system", msgs2[0].content.includes("Приветствую, игрок.") && msgs2[0].content.includes("# YOUR OPENING LINE"));
 T("first history msg is user", msgs2[1].role === "user" && msgs2.length === 2);
+T("output forced Russian only", msgs[0].content.includes("RUSSIAN ONLY") && !msgs[0].content.includes("Match the player's language"));
+
+// user's own first-message.txt greeting must reach the model unfiltered
+const msgs3 = Api.buildMessages([
+  { id: 1, role: "assistant", greeting: true, variants: [{ text: "Привет, {{char}} [Харизма: 0.7] из файла." }], v: 0 },
+  { id: 2, role: "user", content: "hi" }
+]);
+T("greeting passes to model unsanitized", msgs3[0].content.includes("{{char}} [Харизма: 0.7] из файла."));
+// regular model output is still sanitized
+T("non-greeting history still sanitized", !Api.buildMessages([
+  { id: 1, role: "user", content: "hi" },
+  { id: 2, role: "assistant", content: "Ответ {{char}} [Харизма: 0.7]" }
+])[2].content.includes("[Харизма: 0.7]"));
 
 console.log("— save/export roundtrip —");
 const savedTrust = State.play.trust;

@@ -28,7 +28,7 @@ When reporting, keep the <<STATS>> contract from the rulebook.`
       }
 
       system.push(`# SCENE STATE (authoritative, do not contradict)\n${Engine.sceneStatus()}`);
-      system.push(`\n# OUTPUT RULES\n• Stay in character as ${g.character.name}. Never write the player's actions or dialogue.\n• Match the player's language (Russian ↔ English).\n• Style: *actions in single asterisks*, dialogue in «», blank line between paragraphs.\n• CLEAN PROSE ONLY — no XML/HTML tags (</CHARACTER_DESCRIPTION>, <…>), no stat blocks like [Харизма: 0.7] or «Шар Инициативы: […]», no {{placeholders}}, no template markers. The final <<STATS>> line is the ONLY allowed technical line.\n• If "Интерактивные функции" instructions exist above — obey the <<STATS>> contract exactly.\n• No preambles, no out-of-character commentary.`);
+      system.push(`\n# OUTPUT RULES\n• Stay in character as ${g.character.name}. Never write the player's actions or dialogue.\n• RUSSIAN ONLY — every reply is written in Russian (narration, dialogue, thoughts). Never switch to English or any other language, even if the player writes in another one.\n• Style: *actions in single asterisks*, dialogue in «», blank line between paragraphs.\n• CLEAN PROSE ONLY — no XML/HTML tags (</CHARACTER_DESCRIPTION>, <…>), no stat blocks like [Харизма: 0.7] or «Шар Инициативы: […]», no {{placeholders}}, no template markers. The final <<STATS>> line is the ONLY allowed technical line.\n• If "Интерактивные функции" instructions exist above — obey the <<STATS>> contract exactly.\n• No preambles, no out-of-character commentary.`);
 
       const msgs = [{ role: "system", content: system.join("\n") }];
       let sawUser = false;
@@ -38,7 +38,8 @@ When reporting, keep the <<STATS>> contract from the rulebook.`
           msgs.push({ role: "user", content: m.content });
         } else if (m.role === "assistant") {
           const raw = m.content ?? (m.variants && m.variants[m.v] ? m.variants[m.v].text : "");
-          const text = this.sanitize(raw);
+          // the user's own first-message.txt greeting goes to the model as-is
+          const text = m.greeting ? String(raw || "") : this.sanitize(raw);
           if (!text.trim()) continue;
           if (!sawUser) {
             // leading greeting → fold into system (strict APIs want user first)

@@ -1,7 +1,10 @@
 /* ═══════════ app bootstrap ═══════════ */
 (function () {
-  function boot() {
+  async function boot() {
     State.init();
+    // greeting source: first-message.txt in the repo (user's own neural-net
+    // first message). Best-effort: falls back to DEFAULT_GAME.greeting.
+    await Chat.loadGreetingFile();
     UI.init();
     Chat.init();
 
@@ -16,6 +19,13 @@
       "color:#8b8b95");
   }
 
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
-  else boot();
+  // expose the boot promise so tests can await full initialization
+  let bootPromise;
+  if (document.readyState === "loading") {
+    bootPromise = new Promise(res =>
+      document.addEventListener("DOMContentLoaded", () => res(boot()), { once: true }));
+  } else {
+    bootPromise = boot();
+  }
+  window.__bootPromise = bootPromise;
 })();

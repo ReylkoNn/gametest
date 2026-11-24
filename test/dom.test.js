@@ -61,6 +61,7 @@ const $ = s => window.document.querySelector(s);
 const $$ = s => [...window.document.querySelectorAll(s)];
 
 (async () => {
+  await window.__bootPromise;
   console.log("— boot —");
   T("cards rendered", $$("#cards .card").length >= 8);
   T("topbar shows level", $("#topbarText").textContent.includes("Competitive Rivalry"));
@@ -75,6 +76,25 @@ const $$ = s => [...window.document.querySelectorAll(s)];
   T("Вы здесь on Day 1", $$(".row.here").some(r => r.textContent.includes("First Day")));
   T("Вы здесь trust level", $$("#cards .row.here").some(r => r.textContent.includes("Competitive Rivalry")));
   T("tags rendered", $$(".tag").length >= 12);
+
+  console.log("— first-message.txt greeting —");
+  const realFetch = window.fetch;
+  window.fetch = async (url, opts) => {
+    if (String(url).includes("first-message.txt")) {
+      return {
+        ok: true,
+        text: async () => "Приветствие из файла: {{char}} [Харизма: 0.7]\r\nВторая строка."
+      };
+    }
+    return realFetch(url, opts);
+  };
+  const fileLoaded = await window.Chat.loadGreetingFile();
+  T("file greeting loaded", fileLoaded === true);
+  T("State.game.greeting from file", window.State.game.greeting === "Приветствие из файла: {{char}} [Харизма: 0.7]\nВторая строка.");
+  T("lone greeting refreshed from file", window.State.play.messages.length === 1 &&
+    window.State.play.messages[0].variants[0].text.includes("Приветствие из файла"));
+  T("greeting shown raw (no filters)", $(".msg.bot .bubble").textContent.includes("{{char}} [Харизма: 0.7]"));
+  window.fetch = realFetch;
 
   console.log("— location modal —");
   window.UI.openLocation();
