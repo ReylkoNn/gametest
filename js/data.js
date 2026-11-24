@@ -20,6 +20,9 @@ window.DEFAULT_GAME = {
       "but blushes furiously the moment someone notices."
   },
   playerName: "You",
+  greeting:
+`*Вьора лениво облокотилась на дверной косяк, скрестив руки под грудью.*\n\n` +
+`— Значит, это ты — новый «жеребец» короля, — её уши дёрнулись, а взгляд сбегал по твоей академической форме с ехидным одобрением. — Заходи. И не заставляй принцессу ждать у собственной двери.`,
   tags: [
     "Фентези", "Романтика", "Доминирование", "NSFW - взрослый контент",
     "Женщины", "Из глаз мужчины", "CNC", "Много персонажей",
@@ -160,6 +163,7 @@ window.DEFAULT_SETTINGS = {
   model: "",
   temperature: 1.0,
   maxTokens: 1500,
+  avatar: "",               // dataURL; "" → assets/viora-avatar.jpg
   direct: false             // false → через локальный proxy server.py (без CORS)
 };
 

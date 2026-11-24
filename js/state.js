@@ -68,6 +68,10 @@
       this.save();
     },
 
+    avatarSrc() {
+      return this.settings.avatar || "assets/viora-avatar.jpg";
+    },
+
     /* ── snapshots (rollback point for regenerate / answer switching) ── */
     snapshot() {
       const p = this.play;

@@ -1,7 +1,26 @@
-/* ═══════════ chat: render, send, stream, regenerate, variants ═══════════ */
+/* ═══════════ chat: render · send · stream · stop · regenerate ═══════════ */
 (function () {
   let uid = 1;
   let busy = false;
+
+  /* ── tiny safe markdown for bubbles (escape first, then format) ── */
+  function mdRender(raw) {
+    let s = esc(raw == null ? "" : String(raw));
+    s = s.replace(/^(\*{3,}|-{3,})$/gm, "<hr>");
+    s = s.replace(/\*\*\*([^*]+)\*\*\*/g, "<strong><em>$1</em></strong>");
+    s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+    s = s.replace(/(^|[^*\w])\*([^*\n]+)\*/g, "$1<em>$2</em>");
+    s = s.replace(/(^|[^_\w])_([^_\n]+)_/g, "$1<em>$2</em>");
+    s = s.replace(/^(?:&gt;)\s?(.+)$/gm, "<blockquote>$1</blockquote>");
+    const parts = s.split(/\n{2,}/);
+    s = parts.map(p => {
+      p = p.trim();
+      if (!p) return "";
+      if (/^<(?:hr|blockquote)/.test(p)) return p;
+      return "<p>" + p.replace(/\n/g, "<br>") + "</p>";
+    }).join("");
+    return s;
+  }
 
   const Chat = {
     get busy() { return busy; },
@@ -12,13 +31,47 @@
       this.$send = document.getElementById("btnSend");
       this.$skip = document.getElementById("skipTime");
 
-      this.$send.addEventListener("click", () => this.send());
+      this.$send.addEventListener("click", () => {
+        if (busy) this.stop(); else this.send();
+      });
       this.$input.addEventListener("keydown", e => {
-        if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); this.send(); }
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          if (!busy) this.send();
+        }
       });
       this.$input.addEventListener("input", () => this.autogrow());
+
+      // floating "jump to bottom"
+      this.$scrollDown = document.getElementById("scrollDown");
+      this.$scrollDown.addEventListener("click", () => {
+        this._stick = true;
+        this.scrollBottom();
+      });
+      this.$list.addEventListener("scroll", () => {
+        const el = this.$list;
+        const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
+        this._stick = atBottom;
+        this.$scrollDown.classList.toggle("hidden", atBottom);
+      });
+
       window.addEventListener("beforeunload", () => State.save());
+      this.ensureGreeting();
       this.render();
+    },
+
+    /* first launch: in-character greeting from the bot */
+    ensureGreeting() {
+      if (State.play.messages.length) return;
+      const text = (State.game.greeting || "").trim();
+      if (!text) return;
+      State.play.messages.push({
+        id: uid++, role: "assistant", ts: Date.now(),
+        before: State.snapshot(), timeInfo: null, greeting: true,
+        variants: [{ text, status: null, stats: null }],
+        v: 0
+      });
+      State.scheduleSave();
     },
 
     autogrow() {
@@ -31,19 +84,17 @@
     render() {
       const list = this.$list;
       list.innerHTML = "";
-      if (!State.play.messages.length) {
-        list.appendChild(this.welcomeNode());
-        return;
-      }
+      if (!State.settings.base) list.appendChild(this.welcomeNode());
       for (const m of State.play.messages) list.appendChild(this.messageNode(m));
-      this.scrollBottom(false);
+      if (this._stick !== false) this.scrollBottom(false);
+      this.$scrollDown.classList.add("hidden");
     },
 
     welcomeNode() {
       const d = document.createElement("div");
       d.className = "welcome";
       d.innerHTML = `
-        <h2>⚔ The King's Order</h2>
+        <h2><img class="ava-welcome" src="${esc(State.avatarSrc())}" alt=""> ⚔ The King's Order</h2>
         <p>Локальная RP-игра: чат с ботом через твой API, умный Trust, время, гардероб и локации.</p>
         <p>1. Нажми <b>⚙ API</b> и введи провайдера (OpenAI-совместимый: OpenAI, DeepSeek, KoboldCpp, Ollama…)</p>
         <p>2. Жми <kbd>Enter</kbd> и играй. Панель справа — состояние мира.</p>
@@ -64,24 +115,36 @@
         return wrap;
       }
 
-      // assistant (possibly multi-variant)
+      // ── assistant: avatar + column ──
+      const ava = document.createElement("img");
+      ava.className = "ava";
+      ava.src = State.avatarSrc();
+      ava.alt = "";
+      wrap.appendChild(ava);
+
+      const col = document.createElement("div");
+      col.className = "col";
+      wrap.appendChild(col);
+
       const v = m.variants[m.v] || m.variants[0];
       const bubble = document.createElement("div");
       bubble.className = "bubble";
-      bubble.textContent = Api.stripStats(v.text);
-      wrap.appendChild(bubble);
+      bubble.innerHTML = mdRender(Api.sanitize(v.text));
+      col.appendChild(bubble);
 
       if (State.play.toggles.statusLine && v.status && v.status.length) {
         const st = document.createElement("div");
         st.className = "status";
         st.innerHTML = v.status.join("");
-        wrap.appendChild(st);
+        col.appendChild(st);
       }
 
       const meta = document.createElement("div");
       meta.className = "meta";
-      meta.textContent = this.fmtTime(m.ts) + (m.streaming ? " · генерация…" : "");
-      wrap.appendChild(meta);
+      meta.textContent = this.fmtTime(m.ts)
+        + (m.streaming ? " · генерация…" : "")
+        + (m.stopped ? " · остановлено" : "");
+      col.appendChild(meta);
 
       if (m.error) {
         const box = document.createElement("div");
@@ -95,7 +158,7 @@
         retry.textContent = "⟲ Повторить";
         retry.onclick = () => this.retry(m);
         box.appendChild(retry);
-        wrap.appendChild(box);
+        col.appendChild(box);
         return wrap;
       }
 
@@ -108,18 +171,19 @@
         sw.onclick = () => this.switchVariant(m);
         actions.appendChild(sw);
       }
-      const regen = document.createElement("button");
-      regen.textContent = "⟲ Перегенерировать";
-      regen.title = "Шкалы и время вернутся к состоянию до этого ответа";
-      regen.onclick = () => this.regenerate(m);
-      actions.appendChild(regen);
-
+      if (!m.greeting) {
+        const regen = document.createElement("button");
+        regen.textContent = "⟲ Перегенерировать";
+        regen.title = "Шкалы и время вернутся к состоянию до этого ответа";
+        regen.onclick = () => this.regenerate(m);
+        actions.appendChild(regen);
+      }
       const copy = document.createElement("button");
       copy.textContent = "📋";
       copy.title = "Копировать";
-      copy.onclick = () => navigator.clipboard?.writeText(bubble.textContent);
+      copy.onclick = () => navigator.clipboard?.writeText(Api.sanitize(v.text));
       actions.appendChild(copy);
-      wrap.appendChild(actions);
+      col.appendChild(actions);
       return wrap;
     },
 
@@ -137,7 +201,23 @@
       });
     },
 
-    /* ─────────────── send flow ─────────────── */
+    /* ─────────────── send / stop ─────────────── */
+    stop() {
+      if (this._ctrl) this._ctrl.abort();
+    },
+
+    _setSendMode(mode) {
+      if (mode === "stop") {
+        this.$send.classList.add("stop");
+        this.$send.textContent = "⏹";
+        this.$send.title = "Остановить генерацию";
+      } else {
+        this.$send.classList.remove("stop");
+        this.$send.textContent = "➤";
+        this.$send.title = "Отправить";
+      }
+    },
+
     async send() {
       if (busy) return;
       const text = this.$input.value.trim();
@@ -163,6 +243,7 @@
 
       this.$input.value = "";
       this.autogrow();
+      this._stick = true;
       this.render();
 
       const am = {
@@ -173,16 +254,21 @@
       };
       State.play.messages.push(am);
       this.render();
-      const node = this.$list.querySelector(`[data-id="${am.id}"] .bubble`);
-      node.innerHTML = `<span class="typing"><i></i><i></i><i></i></span>`;
-      this.scrollBottom();
+      this._showTyping(am);
 
       await this._generate(am, snap, timeInfo);
     },
 
+    _showTyping(am) {
+      const node = this.$list.querySelector(`[data-id="${am.id}"] .bubble`);
+      if (node) node.innerHTML = `<span class="typing"><i></i><i></i><i></i></span>`;
+      this.scrollBottom();
+    },
+
     async _generate(am, snap, timeInfo) {
       busy = true;
-      this.$send.disabled = true;
+      this._setSendMode("stop");
+      this._ctrl = new AbortController();
       const history = State.play.messages.filter(m => m.id !== am.id);
       const payload = Api.buildMessages(history);
 
@@ -191,9 +277,9 @@
         const raw = await Api.generate(payload, chunk => {
           acc += chunk;
           const node = this.$list.querySelector(`[data-id="${am.id}"] .bubble`);
-          if (node) node.textContent = Api.stripStats(acc) || "…";
-          this.scrollBottom();
-        });
+          if (node) node.innerHTML = mdRender(Api.sanitize(acc)) || "…";
+          if (this._stick !== false) this.scrollBottom();
+        }, this._ctrl.signal);
 
         const full = (raw || acc).trim();
         if (!full) throw new Error("Пустой ответ модели.");
@@ -210,90 +296,84 @@
         am.streaming = false;
         am.ts = Date.now();
         delete am.error;
+        delete am.stopped;
 
         State.scheduleSave();
         this.render();
         UI.refresh();
       } catch (err) {
-        // keep the slot: partial text (if any) stays, user can retry
+        const aborted = err && (err.name === "AbortError" || err.code === 20);
         am.streaming = false;
-        am.error = err.message || String(err);
-        if (acc.trim() && !am.variants[am.v].text) am.variants[am.v].text = acc;
-        State.restore(snap);   // stats never applied — state = pre-reply point
+        if (aborted) {
+          // user pressed Stop: keep whatever was streamed, no stats applied
+          if (acc.trim()) {
+            am.stopped = true;
+            am.variants[am.v].text = acc;
+            am.ts = Date.now();
+            delete am.error;
+            State.scheduleSave();
+          } else {
+            am.error = "Остановлено до начала ответа.";
+            State.restore(snap);
+          }
+        } else {
+          am.error = err.message || String(err);
+          if (acc.trim() && !am.variants[am.v].text) am.variants[am.v].text = acc;
+          State.restore(snap);   // stats never applied — state = pre-reply point
+        }
         UI.refresh();
         this.render();
       } finally {
         busy = false;
-        this.$send.disabled = false;
+        this._ctrl = null;
+        this._setSendMode("send");
         this.$input.focus();
       }
     },
 
-    showError(msg) {
-      const e = document.createElement("div");
-      e.className = "err";
-      e.textContent = "⚠ " + msg;
-      this.$list.appendChild(e);
-      this.scrollBottom();
-      setTimeout(() => e.remove(), 12000);
-    },
-
-    /* ─────────────── regenerate / switch ─────────────── */
+    /* ─────────────── regenerate / switch / retry ─────────────── */
     async retry(m) {
       if (busy || m.role !== "assistant" || !m.error) return;
       delete m.error;
+      delete m.stopped;
       const snap = m.before || State.snapshot();
       State.restore(snap);
       m.variants = [{ text: "", status: null }];
       m.v = 0;
       m.streaming = true;
+      this._stick = true;
       this.render();
       UI.refresh();
-      const node = this.$list.querySelector(`[data-id="${m.id}"] .bubble`);
-      if (node) node.innerHTML = `<span class="typing"><i></i><i></i><i></i></span>`;
-      this.scrollBottom();
+      this._showTyping(m);
       await this._generate(m, snap, m.timeInfo || null);
     },
 
     async regenerate(m) {
       if (busy || m.role !== "assistant") return;
-      // restore scales/time/clothes to the moment BEFORE this reply
       State.restore(m.before);
-
-      // build a fresh variant
-      const snap = State.snapshot();       // identical to m.before (just restored)
-      const history = State.play.messages.filter(x => x.id !== m.id);
-      const payload = Api.buildMessages(history);
-
-      // drop any existing variants (fresh regeneration), keep slot
+      const snap = State.snapshot();
       m.variants = [{ text: "", status: null }];
       m.v = 0;
       m.streaming = true;
       m.before = snap;
+      delete m.stopped;
+      this._stick = true;
       this.render();
       UI.refresh();
-
-      const node = this.$list.querySelector(`[data-id="${m.id}"] .bubble`);
-      if (node) node.innerHTML = `<span class="typing"><i></i><i></i><i></i></span>`;
-      this.scrollBottom();
-
+      this._showTyping(m);
       await this._generate(m, snap, m.timeInfo || null);
     },
 
-    /* switch between previously generated variants — restores each one's state */
+    /* switch between generated variants — restores each one's state */
     async switchVariant(m) {
       if (busy || m.variants.length < 2) return;
-      // apply state of the variant we are LEAVING? No: snapshots are pre-reply,
-      // identical for all variants — restore, then apply target variant's stats.
       State.restore(m.before);
 
       m.v = (m.v + 1) % m.variants.length;
       const v = m.variants[m.v];
       const stats = v.stats || Api.parseStats(v.text);
-      // re-apply this variant's deltas on top of the restored snapshot
       const applied = Engine.applyModelStats(stats);
       v.status = Engine.buildStatus(applied, m.timeInfo || null);
-      // timeInfo stays attached to the message (shared pre-state)
 
       State.scheduleSave();
       this.render();
@@ -301,14 +381,6 @@
     },
 
     /* ─────────────── history utilities ─────────────── */
-    lastSnapshot() {
-      const msgs = State.play.messages;
-      for (let i = msgs.length - 1; i >= 0; i--) {
-        if (msgs[i].role === "assistant") return msgs[i].before;
-      }
-      return State.snapshot();
-    },
-
     truncateFrom(msgId) {
       const i = State.play.messages.findIndex(m => m.id === msgId);
       if (i < 0) return;
@@ -322,4 +394,5 @@
   };
 
   window.Chat = Chat;
+  window.mdRender = mdRender;
 })();

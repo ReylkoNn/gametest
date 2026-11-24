@@ -20,6 +20,18 @@
       this.$scrim.onclick = () => { this.closeSide(); this.closeModal(); };
       document.addEventListener("keydown", e => { if (e.key === "Escape") this.closeModal(); });
 
+      // temperature slider in composer
+      this.$tempRange = document.getElementById("tempRange");
+      this.$tempVal = document.getElementById("tempVal");
+      this.$tempRange.value = State.settings.temperature;
+      this.$tempVal.textContent = Number(State.settings.temperature).toFixed(2).replace(/0$/, "").replace(/\.$/, ".0");
+      this.$tempRange.addEventListener("input", () => {
+        const v = clamp(parseFloat(this.$tempRange.value) || 0, 0, 2);
+        State.settings.temperature = v;
+        this.$tempVal.textContent = v.toFixed(2).replace(/0$/, "").replace(/\.$/, ".0");
+        State.scheduleSave();
+      });
+
       this.renderAll();
     },
 
@@ -28,6 +40,12 @@
     renderAll() {
       this.renderTopbar();
       this.renderCards();
+      const tv = document.getElementById("tempVal");
+      if (tv && this.$tempRange) {
+        this.$tempRange.value = State.settings.temperature;
+        const v = Number(State.settings.temperature);
+        tv.textContent = v.toFixed(2).replace(/0$/, "").replace(/\.$/, ".0");
+      }
     },
 
     /* ───────────── top status bar ───────────── */
@@ -36,6 +54,8 @@
       this.$topbar.classList.toggle("hidden", hidden);
       this.$topShow.classList.toggle("hidden", !hidden);
       document.body.classList.toggle("no-topbar", hidden);
+      const ava = document.getElementById("topAva");
+      if (ava && ava.src !== State.avatarSrc()) ava.src = State.avatarSrc();
       if (hidden) return;
       const lvl = Engine.levelName(State.play.trust);
       const pend = Engine.pendingCount();
@@ -451,7 +471,29 @@
           <div class="field"><label>Модель</label>
             <input id="setModel" value="${esc(s.model)}" placeholder="gpt-4o-mini / deepseek-chat / …"></div>
           <div class="field" style="max-width:110px"><label>Temp</label>
-            <input id="setTemp" type="number" step="0.1" min="0" max="2" value="${s.temperature}"></div>
+            <input id="setTemp" type="number" step="0.05" min="0" max="2" value="${s.temperature}"></div>
+        </div>
+        <div class="field">
+          <label>Температура — уровень свободы модели</label>
+          <div class="chips" id="tempPresets">
+            <button class="chip" data-t="0">0 · логично</button>
+            <button class="chip" data-t="0.4">0.4 · строго</button>
+            <button class="chip" data-t="0.7">0.7 · ровно</button>
+            <button class="chip" data-t="1">1.0 · живо</button>
+            <button class="chip" data-t="1.3">1.3 · игриво</button>
+            <button class="chip" data-t="1.7">1.7 · хаос</button>
+          </div>
+          <div class="tip">Ниже — точнее и консервативнее, выше — креативнее и безумнее. Обычно 0.7–1.3.</div>
+        </div>
+        <div class="field">
+          <label>Аватарка бота</label>
+          <div class="ava-row">
+            <img id="avaPrev" src="${esc(State.avatarSrc())}" alt="">
+            <div>
+              <input type="file" id="setAvatar" accept="image/*" style="max-width:230px">
+              <div class="tip">Любое квадратное фото — обрежется в круг 128×128. <button class="ghost-btn" id="avaReset" style="margin-left:6px">Сбросить</button></div>
+            </div>
+          </div>
         </div>
         <div class="row2">
           <div class="field"><label>Max tokens</label>
@@ -473,11 +515,55 @@
         s.base = this.$modal.querySelector("#setBase").value.trim();
         s.key = this.$modal.querySelector("#setKey").value.trim();
         s.model = this.$modal.querySelector("#setModel").value.trim();
-        s.temperature = clamp(parseFloat(this.$modal.querySelector("#setTemp").value) || 1, 0, 2);
+        s.temperature = clamp(parseFloat(this.$modal.querySelector("#setTemp").value), 0, 2);
+        if (!Number.isFinite(s.temperature)) s.temperature = 1.0;
         s.maxTokens = clamp(parseInt(this.$modal.querySelector("#setMaxTok").value) || 1500, 64, 32000);
         s.direct = this.$modal.querySelector("#setDirect").value === "direct";
         State.save();
         this.closeModal();
+        this.renderAll();
+        Chat.render();   // welcome card disappears once API is configured
+      };
+      // temperature presets
+      const tInput = this.$modal.querySelector("#setTemp");
+      this.$modal.querySelectorAll("#tempPresets .chip").forEach(b => {
+        b.onclick = () => {
+          tInput.value = b.dataset.t;
+          this.$modal.querySelectorAll("#tempPresets .chip").forEach(x => x.classList.remove("sel-orange"));
+          b.classList.add("sel-orange");
+        };
+        if (Math.abs(parseFloat(b.dataset.t) - s.temperature) < 0.001) b.classList.add("sel-orange");
+      });
+      // avatar upload: crop to square 128×128 → dataURL
+      const avaFile = this.$modal.querySelector("#setAvatar");
+      avaFile.onchange = () => {
+        const f = avaFile.files && avaFile.files[0];
+        if (!f) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          const img = new Image();
+          img.onload = () => {
+            const c = document.createElement("canvas");
+            c.width = c.height = 128;
+            const ctx = c.getContext("2d");
+            const side = Math.min(img.width, img.height);
+            ctx.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, 128, 128);
+            s.avatar = c.toDataURL("image/jpeg", 0.85);
+            State.save();
+            this.$modal.querySelector("#avaPrev").src = s.avatar;
+            this.renderAll();
+            Chat.render();
+          };
+          img.src = reader.result;
+        };
+        reader.readAsDataURL(f);
+      };
+      this.$modal.querySelector("#avaReset").onclick = () => {
+        s.avatar = "";
+        State.save();
+        this.$modal.querySelector("#avaPrev").src = State.avatarSrc();
+        this.renderAll();
+        Chat.render();
       };
       this.$modal.querySelector("#btnTest").onclick = async () => {
         const out = this.$modal.querySelector("#apiTestOut");
@@ -577,6 +663,7 @@
       r.onload = () => {
         try {
           State.importJSON(r.result);
+          Chat.ensureGreeting();
           UI.renderAll();
           Chat.render();
           alert("Сохранение загружено ✓");
@@ -590,6 +677,7 @@
     resetAll() {
       if (!confirm("Начать новую игру? Текущий прогресс будет стёрт.")) return;
       State.resetAll();
+      Chat.ensureGreeting();
       UI.renderAll();
       Chat.render();
     },

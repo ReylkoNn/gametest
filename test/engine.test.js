@@ -93,6 +93,30 @@ T("stats off when interactive=false", (() => {
   return o.trust === null;
 })());
 
+console.log("— sanitize (template/stat garbage) —");
+const leaky =
+  'Шрамы и рыцарское&lt;decimalradan"&gt;\\[Харизма: 0.7\\] ' +
+  'Шар Инициативы: \\[(План открытый) + (План открытый, либо невозможен)\\]' +
+  '&lt;/CHARACTER_DESCRIPTION&gt; конец';
+const clean = Api.sanitize(leaky);
+T("no escaped tags", !clean.includes("&lt;") && !clean.includes("CHARACTER_DESCRIPTION"));
+T("no decimalradan", !clean.includes("decimalradan"));
+T("no stat block", !clean.includes("Харизма"));
+T("no initiative sphere", !clean.includes("Шар Инициативы"));
+T("keeps prose", clean.includes("Шрамы и рыцарское") && clean.includes("конец"));
+T("stats tail cut", !Api.sanitize("текст <<STATS {\"trust_delta\":1}>>").includes("STATS"));
+T("{{char}} replaced", Api.sanitize("Hi {{char}}, {{user}}!").includes("Viora"));
+T("plain text untouched", Api.sanitize("Обычный текст *и* разметка.") === "Обычный текст *и* разметка.");
+
+console.log("— temperature —");
+State.settings.temperature = 0;
+T("temp 0 preserved in payload", Api._payload([], false).temperature === 0);
+State.settings.temperature = 1.4;
+T("temp 1.4 in payload", Api._payload([], false).temperature === 1.4);
+State.settings.temperature = "junk";
+T("temp junk → 1.0", Api._payload([], false).temperature === 1.0);
+State.settings.temperature = 1.0;
+
 console.log("— prompt assembly —");
 State.play.messages = [
   { id: 1, role: "user", content: "hello" },
@@ -104,6 +128,14 @@ T("3 messages (sys+user+assistant)", msgs.length === 3);
 T("assistant stats stripped", !msgs[2].content.includes("<<STATS"));
 T("system has trust", msgs[0].content.includes("Competitive Rivalry") || msgs[0].content.includes("Trust:"));
 T("system has scene", msgs[0].content.includes("Viora wears"));
+
+// leading assistant greeting must fold into system, not float before first user
+const msgs2 = Api.buildMessages([
+  { id: 1, role: "assistant", variants: [{ text: "Приветствую, игрок." }], v: 0 },
+  { id: 2, role: "user", content: "hi" }
+]);
+T("greeting folded into system", msgs2[0].content.includes("Приветствую, игрок.") && msgs2[0].content.includes("# YOUR OPENING LINE"));
+T("first history msg is user", msgs2[1].role === "user" && msgs2.length === 2);
 
 console.log("— save/export roundtrip —");
 const savedTrust = State.play.trust;

@@ -64,7 +64,12 @@ const $$ = s => [...window.document.querySelectorAll(s)];
   console.log("— boot —");
   T("cards rendered", $$("#cards .card").length >= 8);
   T("topbar shows level", $("#topbarText").textContent.includes("Competitive Rivalry"));
+  T("topbar avatar", $("#topAva").getAttribute("src").includes("viora-avatar"));
   T("welcome shown", !!$(".welcome"));
+  T("temp slider present", !!$("#tempRange") && !!$("#tempVal"));
+  T("greeting injected", window.State.play.messages.length === 1 && window.State.play.messages[0].greeting === true);
+  T("greeting has avatar", !!$(".msg.bot .ava"));
+  T("greeting rendered as markdown", $(".msg.bot .bubble").innerHTML.includes("<em>"));
   T("trust bar width ≈35%", Math.abs(parseFloat($(".bar i").style.width) - (19 / 54) * 100) < 0.5);
   T("Вы здесь on Late Night", $$(".row.here").some(r => r.textContent.includes("Late Night")));
   T("Вы здесь on Day 1", $$(".row.here").some(r => r.textContent.includes("First Day")));
@@ -119,14 +124,13 @@ const $$ = s => [...window.document.querySelectorAll(s)];
   console.log("— send flow —");
   const input = $("#input");
   input.value = "Привет, Виора! Я всё-таки пришёл.";
-  const before = { ...window.State.play.pending };
   $("#btnSend").click();
   // wait for the fake stream to finish
   for (let i = 0; i < 100 && window.Chat.busy; i++) await new Promise(r => setTimeout(r, 20));
   await new Promise(r => setTimeout(r, 50));
 
   const msgs = window.State.play.messages;
-  T("2 messages", msgs.length === 2);
+  T("3 messages (greeting+user+bot)", msgs.length === 3);
   T("pending flushed", window.State.play.pending.location === null && window.State.play.pending.npcClothes === null);
   T("location applied", window.State.play.location === "Town Square");
   T("clothes applied", window.State.play.npcClothes === "Nightshirt (Bra Off)");
@@ -134,14 +138,15 @@ const $$ = s => [...window.document.querySelectorAll(s)];
   T("time advanced +5 → 18:40", window.State.play.minutes === 18 * 60 + 40);
   T("trust +2 → 26", window.State.play.trust === 26);
   T("level Competitive Companionship", window.Engine.levelName(window.State.play.trust) === "Competitive Companionship");
-  T("bubble has no STATS", !$(".msg.bot .bubble").textContent.includes("<<STATS"));
+  const lastBotBubble = () => [...$$(".msg.bot .bubble")].pop();
+  T("bubble has no STATS", !lastBotBubble().textContent.includes("<<STATS"));
   T("status line shown", !!$(".msg.bot .status"));
-  T("status has trust line", $(".msg.bot .status").textContent.includes("Trust: 24 → 26"));
-  T("status has time line", $(".msg.bot .status").textContent.includes("⏱"));
+  T("status has trust line", [...$$(".msg.bot .status")].pop().textContent.includes("Trust: 24 → 26"));
+  T("status has time line", [...$$(".msg.bot .status")].pop().textContent.includes("⏱"));
 
   console.log("— regenerate rolls back —");
   const snapTrust = 24; // trust before the reply
-  const botMsg = window.State.play.messages[1];
+  const botMsg = window.State.play.messages[2];
   T("snapshot stored before reply", botMsg.before.trust === snapTrust);
   // point fetch at a different reply (model-driven clothes + location move)
   window.fetch = async (url, opts) => {
@@ -161,17 +166,17 @@ const $$ = s => [...window.document.querySelectorAll(s)];
   $$(".msg.bot .actions button").find(b => b.textContent.includes("Перегенерировать")).click();
   for (let i = 0; i < 100 && window.Chat.busy; i++) await new Promise(r => setTimeout(r, 20));
   await new Promise(r => setTimeout(r, 50));
-  T("still 2 messages", window.State.play.messages.length === 2);
+  T("still 3 messages", window.State.play.messages.length === 3);
   T("trust restored then -1 → 23", window.State.play.trust === 23);
   T("model moved clothes after rollback", window.State.play.npcClothes === "Nightshirt (Panties Off)");
   T("model moved location after rollback", window.State.play.location === "Viora's Bathroom");
-  T("new text rendered", $(".msg.bot .bubble").textContent.includes("Don't push your luck"));
-  T("status updated", $(".msg.bot .status").textContent.includes("24 → 23"));
-  T("status shows clothes move", $(".msg.bot .status").textContent.includes("Nightshirt (Panties Off)"));
+  T("new text rendered", lastBotBubble().textContent.includes("Don't push your luck"));
+  T("status updated", [...$$(".msg.bot .status")].pop().textContent.includes("24 → 23"));
+  T("status shows clothes move", [...$$(".msg.bot .status")].pop().textContent.includes("Nightshirt (Panties Off)"));
 
   console.log("— variant switch —");
   // add a second variant manually to test switch
-  const m = window.State.play.messages[1];
+  const m = window.State.play.messages[2];
   m.variants.push({
     text: "«Fine.» <<STATS {\"trust_delta\":1}>>",
     stats: { trust_delta: 1 },
@@ -190,8 +195,8 @@ const $$ = s => [...window.document.querySelectorAll(s)];
   $("#btnSend").click();
   for (let i = 0; i < 60 && window.Chat.busy; i++) await new Promise(r => setTimeout(r, 20));
   await new Promise(r => setTimeout(r, 30));
-  T("error state kept in history", window.State.play.messages.length === 4);
-  T("error object set", !!window.State.play.messages[3].error);
+  T("error state kept in history", window.State.play.messages.length === 5);
+  T("error object set", !!window.State.play.messages[4].error);
   T("error box rendered", [...$$(".msg.bot .status .down")].pop()?.textContent.includes("Cannot reach API"));
   T("retry button present", [...$$(".msg.bot button")].some(b => b.textContent.includes("Повторить")));
   // restore good fetch and retry
@@ -210,9 +215,24 @@ const $$ = s => [...window.document.querySelectorAll(s)];
   [...$$(".msg.bot button")].find(b => b.textContent.includes("Повторить")).click();
   for (let i = 0; i < 60 && window.Chat.busy; i++) await new Promise(r => setTimeout(r, 20));
   await new Promise(r => setTimeout(r, 30));
-  T("retry cleared error", !window.State.play.messages[3].error);
-  T("retry produced text", window.State.play.messages[3].variants[0].text.includes("Better late"));
-  T("retry applied stats", window.State.play.messages[3].variants[0].status.some(s => s.includes("Trust:")));
+  T("retry cleared error", !window.State.play.messages[4].error);
+  T("retry produced text", window.State.play.messages[4].variants[0].text.includes("Better late"));
+  T("retry applied stats", window.State.play.messages[4].variants[0].status.some(s => s.includes("Trust:")));
+
+  console.log("— stop generation —");
+  window.fetch = (url, opts) => new Promise((_, reject) => {
+    opts.signal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+  });
+  $("#input").value = "это сообщение прервётся";
+  $("#btnSend").click();
+  for (let i = 0; i < 60 && !window.Chat.busy; i++) await new Promise(r => setTimeout(r, 10));
+  T("send button switches to stop", $("#btnSend").classList.contains("stop") && $("#btnSend").textContent === "⏹");
+  window.Chat.stop();
+  for (let i = 0; i < 60 && window.Chat.busy; i++) await new Promise(r => setTimeout(r, 20));
+  await new Promise(r => setTimeout(r, 30));
+  T("stop restored send button", !$("#btnSend").classList.contains("stop") && $("#btnSend").textContent === "➤");
+  T("stop kept user msg + error slot", window.State.play.messages.length === 7 && !!window.State.play.messages[6].error);
+  T("stop error message", window.State.play.messages[6].error.includes("Остановлено"));
 
   console.log("— settings modal —");
   window.UI.openSettings();
@@ -227,7 +247,7 @@ const $$ = s => [...window.document.querySelectorAll(s)];
   T("localStorage has save", !!window.localStorage.getItem("kings-order-save-v1"));
   const exported = window.State.exportJSON();
   const expPlay = JSON.parse(exported).play;
-  T("export parses", typeof expPlay.trust === "number" && expPlay.messages.length === 4);
+  T("export parses", typeof expPlay.trust === "number" && expPlay.messages.length === 7);
 
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed ? 1 : 0);

@@ -10,6 +10,7 @@
 
 <!-- ══════════════ top status bar ══════════════ -->
 <header id="topbar" class="hidden">
+  <img id="topAva" src="assets/viora-avatar.jpg" alt="">
   <span id="topbarText"></span>
   <button id="topbarClose" class="icon-btn" title="Скрыть">✕</button>
 </header>
@@ -20,12 +21,18 @@
   <!-- ══════════════ chat pane ══════════════ -->
   <main id="chatPane">
     <div id="messages" aria-live="polite"></div>
+    <button id="scrollDown" class="hidden" title="К последнему сообщению">↓</button>
 
     <div id="composer">
       <div id="composerOpts">
         <label class="chk" title="Не двигать игровые часы при этой отправке">
           <input type="checkbox" id="skipTime">
           <span>⏱ без времени</span>
+        </label>
+        <label class="chk temp-chk" title="Температура генерации — как креативна модель">
+          <span>🌡</span>
+          <input type="range" id="tempRange" min="0" max="2" step="0.05">
+          <b id="tempVal">1.0</b>
         </label>
         <button id="btnSettings" class="ghost-btn" title="Настройки API">⚙ API</button>
         <button id="btnPanel" class="ghost-btn mob-only" title="Панель состояния">📋</button>
