@@ -126,17 +126,17 @@ const msgs = Api.buildMessages(State.play.messages);
 T("system first", msgs[0].role === "system");
 T("3 messages (sys+user+assistant)", msgs.length === 3);
 T("assistant stats stripped", !msgs[2].content.includes("<<STATS"));
-T("system has trust", msgs[0].content.includes("Competitive Rivalry") || msgs[0].content.includes("Trust:"));
-T("system has scene", msgs[0].content.includes("Viora wears"));
+T("system has trust", msgs[0].content.includes("Текущее Доверие") || msgs[0].content.includes("Competitive Rivalry"));
+T("system has scene", msgs[0].content.includes("Виора носит"));
 
 // leading assistant greeting must fold into system, not float before first user
 const msgs2 = Api.buildMessages([
   { id: 1, role: "assistant", variants: [{ text: "Приветствую, игрок." }], v: 0 },
   { id: 2, role: "user", content: "hi" }
 ]);
-T("greeting folded into system", msgs2[0].content.includes("Приветствую, игрок.") && msgs2[0].content.includes("# YOUR OPENING LINE"));
+T("greeting folded into system", msgs2[0].content.includes("Приветствую, игрок.") && msgs2[0].content.includes("# ТВОЯ ПЕРВАЯ РЕПЛИКА"));
 T("first history msg is user", msgs2[1].role === "user" && msgs2.length === 2);
-T("output forced Russian only", msgs[0].content.includes("RUSSIAN ONLY") && !msgs[0].content.includes("Match the player's language"));
+T("output forced Russian only", msgs[0].content.includes("ТОЛЬКО РУССКИЙ ЯЗЫК") && msgs[0].content.includes("своими именами") && !msgs[0].content.includes("Match the player's language"));
 
 // user's own first-message.txt greeting must reach the model unfiltered
 const msgs3 = Api.buildMessages([

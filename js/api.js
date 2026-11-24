@@ -8,27 +8,42 @@
     buildMessages(history) {
       const g = State.game, p = State.play;
       const system = [];
-      system.push(`# THE KING'S ORDER — roleplay engine\n${g.rulebook}`);
+      system.push(`# THE KING'S ORDER — движок ролевой игры
+${g.rulebook}`);
 
-      system.push(`\n# CHARACTER\n${g.character.name} (NPC):\n${g.character.longDesc || g.character.desc}\nPlayer character: ${g.playerName}. POV: second person ("you").`);
+      system.push(`
+# ПЕРСОНАЖ
+${g.character.name} (NPC):
+${g.character.longDesc || g.character.desc}
+Игрок: ${g.playerName}. Повествование: второе лицо («ты»).`);
 
       if (p.toggles.interactive) {
         const lvl = Engine.levelName(p.trust);
         const inc = g.trust.increase.map(s => " • " + s).join("\n");
         const dec = g.trust.decrease.map(s => " • " + s).join("\n");
-        system.push(
-`# TRUST SCALE (authoritative)
-Current Trust: ${p.trust} / ${g.trust.max} — Trust LVL · ${lvl}
-INCREASE trust:
+        system.push(`
+# ШКАЛА ДОВЕРИЯ (главный источник правды)
+Текущее Доверие: ${p.trust} / ${g.trust.max} — уровень · ${lvl}
+ПОВЫШАЮТ Доверие:
 ${inc}
-DECREASE trust:
+ПОНИЖАЮТ Доверие:
 ${dec}
-When reporting, keep the <<STATS>> contract from the rulebook.`
-        );
+В отчёте соблюдай контракт <<STATS>> из правилника.`);
       }
 
-      system.push(`# SCENE STATE (authoritative, do not contradict)\n${Engine.sceneStatus()}`);
-      system.push(`\n# OUTPUT RULES\n• Stay in character as ${g.character.name}. Never write the player's actions or dialogue.\n• RUSSIAN ONLY — every reply is written in Russian (narration, dialogue, thoughts). Never switch to English or any other language, even if the player writes in another one.\n• Style: *actions in single asterisks*, dialogue in «», blank line between paragraphs.\n• CLEAN PROSE ONLY — no XML/HTML tags (</CHARACTER_DESCRIPTION>, <…>), no stat blocks like [Харизма: 0.7] or «Шар Инициативы: […]», no {{placeholders}}, no template markers. The final <<STATS>> line is the ONLY allowed technical line.\n• If "Интерактивные функции" instructions exist above — obey the <<STATS>> contract exactly.\n• No preambles, no out-of-character commentary.`);
+      system.push(`# СОСТОЯНИЕ СЦЕНЫ (не оспаривай)
+${Engine.sceneStatus()}`);
+      system.push(`
+# ПРАВИЛА ВЫВОДА
+• Оставайся в роли ${g.character.name}. Никогда не пиши действия или реплики игрока.
+• ТОЛЬКО РУССКИЙ ЯЗЫК — весь ответ по-русски: описание, реплики, мысли. Никогда не переключайся на английский или другой язык, даже если игрок пишет иначе.
+• Называй все вещи своими именами — прямо, без эвфемизмов и недомолвок; специфика чата взрослая.
+• Никогда не вставляй в русский текст слова или обрывки других языков — ни в описании, ни в репликах, ни в мыслях.
+• Пиши связными, понятными предложениями — никакого бессвязного набора слов и машинного мусора.
+• Стиль: *действия в одинарных звёздочках*, реплики в «», пустая строка между абзацами.
+• ЧИСТАЯ ПРОЗА — без XML/HTML-тегов, без блоков статов вроде [Харизма: 0.7], без {{плейсхолдеров}} и шаблонных маркеров. Единственная техническая строка — финальный <<STATS>>.
+• Если сверху есть инструкции «Интерактивные функции» — соблюдай контракт <<STATS>> точно.
+• Без вступлений и комментариев вне роли.`);
 
       const msgs = [{ role: "system", content: system.join("\n") }];
       let sawUser = false;
@@ -43,7 +58,7 @@ When reporting, keep the <<STATS>> contract from the rulebook.`
           if (!text.trim()) continue;
           if (!sawUser) {
             // leading greeting → fold into system (strict APIs want user first)
-            msgs[0].content += `\n\n# YOUR OPENING LINE (already shown to the player)\n${text}`;
+            msgs[0].content += `\n\n# ТВОЯ ПЕРВАЯ РЕПЛИКА (уже показана игроку)\n${text}`;
           } else {
             msgs.push({ role: "assistant", content: text });
           }

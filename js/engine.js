@@ -189,10 +189,10 @@
     sceneStatus() {
       const p = State.play;
       return [
-        `Day ${p.day} · ${this.fmtClock(p.minutes)} (${this.periodLabel(p.minutes)})`,
-        `Location: ${p.location}`,
-        `Viora wears: ${p.npcClothes}`,
-        `You wear: ${p.playerClothes}`
+        `День ${p.day} · ${this.fmtClock(p.minutes)} (${this.periodLabel(p.minutes)})`,
+        `Локация: ${p.location}`,
+        `Виора носит: ${p.npcClothes}`,
+        `На тебе: ${p.playerClothes}`
       ].join("\n");
     }
   };

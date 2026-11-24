@@ -14,6 +14,7 @@
       this.game = deepMerge(clone(window.DEFAULT_GAME), saved && saved.game);
       this.settings = deepMerge(clone(window.DEFAULT_SETTINGS), saved && saved.settings);
       this.play = deepMerge(clone(window.DEFAULT_PLAY), saved && saved.play);
+      this._migrateContent();
       // never trust saved message blobs from older versions
       if (!Array.isArray(this.play.messages)) this.play.messages = [];
       if (!this.play.pending) this.play.pending = { location: null, npcClothes: null, playerClothes: null, day: null, minutes: null };
@@ -57,6 +58,7 @@
       this.settings = deepMerge(clone(window.DEFAULT_SETTINGS), data.settings || {});
       this.play = deepMerge(clone(window.DEFAULT_PLAY), data.play || {});
       if (!Array.isArray(this.play.messages)) this.play.messages = [];
+      this._migrateContent();
       this.save();
     },
 
@@ -66,6 +68,19 @@
       this.settings = clone(window.DEFAULT_SETTINGS);
       this.play = clone(window.DEFAULT_PLAY);
       this.save();
+    },
+
+    /* old builds shipped an English rulebook/longDesc — refresh unedited copies */
+    _migrateContent() {
+      const g = this.game;
+      if (g && typeof g.rulebook === "string" &&
+          g.rulebook.startsWith("THE KING'S ORDER — condensed rulebook")) {
+        g.rulebook = window.DEFAULT_GAME.rulebook;
+      }
+      if (g && g.character && typeof g.character.longDesc === "string" &&
+          g.character.longDesc.startsWith("Viora — elf princess")) {
+        g.character.longDesc = window.DEFAULT_GAME.character.longDesc;
+      }
     },
 
     avatarSrc() {
