@@ -81,6 +81,12 @@
           g.character.longDesc.startsWith("Viora — elf princess")) {
         g.character.longDesc = window.DEFAULT_GAME.character.longDesc;
       }
+      if (g && g.trust && Array.isArray(g.trust.increase) &&
+          typeof g.trust.increase[0] === "string" &&
+          g.trust.increase[0].startsWith("Pamper the bratty")) {
+        g.trust.increase = window.DEFAULT_GAME.trust.increase.slice();
+        g.trust.decrease = window.DEFAULT_GAME.trust.decrease.slice();
+      }
     },
 
     avatarSrc() {

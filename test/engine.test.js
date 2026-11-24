@@ -161,5 +161,35 @@ State.play.trust = 1;
 State.importJSON(json);
 T("import restores", State.play.trust === savedTrust);
 
+console.log("— old-english save migration —");
+{
+  const oldGame = JSON.parse(JSON.stringify(State.game));
+  oldGame.rulebook = "THE KING'S ORDER — condensed rulebook (v5-style)\n\nPREMISE\nAfter winning a royal wager...";
+  oldGame.character.longDesc = "Viora — elf princess, silver hair...";
+  oldGame.trust.increase = ["Pamper the bratty elf princess..."];
+  oldGame.trust.decrease = ["Don't act like a self-righteous asshole..."];
+  global.localStorage._s["kings-order-save-v1"] = JSON.stringify({
+    v: 1, game: oldGame, settings: State.settings,
+    play: { trust: 19, day: 1, minutes: 600, location: "X",
+            npcClothes: "A", playerClothes: "B", messages: [],
+            pending: {}, toggles: { interactive: true, hideStats: false, statusLine: true } }
+  });
+  State.init();
+  T("old rulebook replaced", State.game.rulebook.startsWith("THE KING'S ORDER — сводный"));
+  T("old longDesc replaced", State.game.character.longDesc.startsWith("Виора"));
+  T("old trust rules replaced", State.game.trust.increase[0].startsWith("Балуй"));
+  // user-edited rulebook must NOT be clobbered
+  const edited = JSON.parse(JSON.stringify(State.game));
+  edited.rulebook = "Мой кастомный правилник";
+  global.localStorage._s["kings-order-save-v1"] = JSON.stringify({
+    v: 1, game: edited, settings: State.settings,
+    play: { trust: 19, day: 1, minutes: 600, location: "X",
+            npcClothes: "A", playerClothes: "B", messages: [],
+            pending: {}, toggles: { interactive: true, hideStats: false, statusLine: true } }
+  });
+  State.init();
+  T("edited rulebook kept", State.game.rulebook === "Мой кастомный правилник");
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);
